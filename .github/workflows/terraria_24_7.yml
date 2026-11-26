@@ -122,12 +122,26 @@ jobs:
         if: always() && !cancelled() && (github.event.inputs.auto_restart != 'false')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IN_MODE: ${{ github.event.inputs.server_mode || 'vanilla-1461' }}
+          IN_WORLD: ${{ github.event.inputs.world_name || 'FilmFeed_Large_World' }}
+          IN_SIZE: ${{ github.event.inputs.world_size || '3' }}
+          IN_DIFF: ${{ github.event.inputs.difficulty || '1' }}
+          IN_SEED: ${{ github.event.inputs.seed || '' }}
+          IN_TUNNEL: ${{ github.event.inputs.tunnel_provider || 'bore' }}
         run: |
           echo "🚀 Dispatching next 24/7 server cycle..."
           sleep 3
+          PAYLOAD=$(jq -n \
+            --arg mode "$IN_MODE" \
+            --arg world "$IN_WORLD" \
+            --arg size "$IN_SIZE" \
+            --arg diff "$IN_DIFF" \
+            --arg seed "$IN_SEED" \
+            --arg tunnel "$IN_TUNNEL" \
+            '{ref:"main",inputs:{server_mode:$mode,world_name:$world,world_size:$size,difficulty:$diff,seed:$seed,tunnel_provider:$tunnel,auto_restart:"true"}}')
           curl -s -X POST \
             -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/workflows/terraria_24_7.yml/dispatches" \
-            -d '{"ref":"main","inputs":{"server_mode":"${{ github.event.inputs.server_mode || '\''vanilla-1461'\'' }}","world_name":"${{ github.event.inputs.world_name || '\''FilmFeed_Large_World'\'' }}","world_size":"${{ github.event.inputs.world_size || '\''3'\'' }}","difficulty":"${{ github.event.inputs.difficulty || '\''1'\'' }}","seed":"${{ github.event.inputs.seed || '\'''\'' }}","tunnel_provider":"${{ github.event.inputs.tunnel_provider || '\''bore'\'' }}","auto_restart":"true"}}'
+            -d "$PAYLOAD"
           echo "✅ Next 24/7 loop dispatched!"

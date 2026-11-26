@@ -1,0 +1,39 @@
+# ========================================================
+# Terraria 1.4.6.1 Dedicated Server Configuration
+# Optimized for 24/7 GitHub Actions Cloud Hosting
+# ========================================================
+
+# Path to the world file (stored in worlds/ directory for 100% git persistence)
+world=./worlds/FilmFeed_Large_World.wld
+
+# Auto-create a world if not found (1=Small, 2=Medium, 3=Large)
+# 3 = Large World (8400 x 2400 tiles) - Maximum exploration space!
+autocreate=3
+
+# World Name
+worldname=FilmFeed_Large_World
+
+# Difficulty: 0=Classic, 1=Expert, 2=Master, 3=Journey
+difficulty=1
+
+# Max simultaneous players
+maxplayers=16
+
+# Server port (default Terraria port)
+port=7777
+
+# Server password (leave blank for open access)
+password=
+
+# Message of the Day shown to players upon connecting
+motd=🔥 Welcome to FilmFeed 24/7 Terraria Server! Continuous uptime, persistent Large World.
+
+# Storage location for worlds
+worldpath=./worlds
+
+# Security & performance optimizations
+secure=1
+upnp=0
+npcstream=60
+priority=1
+language=en-US

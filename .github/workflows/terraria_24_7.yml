@@ -1,0 +1,106 @@
+name: Terraria 24/7 Dedicated Server
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Terraria Server Version (e.g. 1461 for 1.4.6.1, 1449 for 1.4.4.9)'
+        required: true
+        default: '1461'
+      world_size:
+        description: 'World Size (3 = Large, 2 = Medium, 1 = Small)'
+        required: true
+        default: '3'
+      difficulty:
+        description: 'World Difficulty (0 = Classic, 1 = Expert, 2 = Master)'
+        required: true
+        default: '1'
+      auto_restart:
+        description: 'Enable 24/7 Infinite Auto-Restart Loop'
+        required: true
+        type: boolean
+        default: true
+  schedule:
+    # Backup safety trigger every 6 hours
+    - cron: '0 */6 * * *'
+  repository_dispatch:
+    types: [restart_terraria_server]
+
+permissions:
+  contents: write
+  actions: write
+  id-token: write
+
+concurrency:
+  group: terraria-active-server
+  cancel-in-progress: false
+
+jobs:
+  run-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # 6 hours max per GitHub runner
+
+    steps:
+      - name: 📥 Checkout Repository with World Saves
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🛠️ Install Linux Server Dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y curl unzip jq libatomic1 screen
+
+      - name: ⚙️ Configure Server Parameters
+        run: |
+          mkdir -p worlds config scripts bin
+          
+          # Apply workflow dispatch inputs if triggered manually
+          if [ "${{ github.event.inputs.world_size }}" != "" ]; then
+            sed -i "s/^autocreate=.*/autocreate=${{ github.event.inputs.world_size }}/" config/serverconfig.txt
+          fi
+          if [ "${{ github.event.inputs.difficulty }}" != "" ]; then
+            sed -i "s/^difficulty=.*/difficulty=${{ github.event.inputs.difficulty }}/" config/serverconfig.txt
+          fi
+          
+          chmod +x scripts/start_server.sh scripts/tunnel.sh
+
+      - name: 🎮 Launch 24/7 Terraria Dedicated Server & Tunnel
+        env:
+          TERRARIA_VERSION: ${{ github.event.inputs.version || '1461' }}
+          PLAYIT_SECRET_KEY: ${{ secrets.PLAYIT_SECRET_KEY }}
+          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./scripts/start_server.sh
+
+      - name: 💾 Commit & Push Persistent World Save
+        if: always()
+        run: |
+          git config --global user.name "Terraria-Cloud-Bot"
+          git config --global user.email "bot@terraria-server.cloud"
+          
+          git add worlds/
+          if git status --porcelain worlds/ | grep -q 'worlds/'; then
+            echo "💾 Changes detected in world save files. Committing to git..."
+            git commit -m "chore(save): auto-save world state [$(date -u +'%Y-%m-%d %H:%M:%S UTC')]"
+            git push origin main || (git pull --rebase origin main && git push origin main)
+            echo "✅ World save successfully synchronized to GitHub repository!"
+          else
+            echo "ℹ️ No world file changes to commit."
+          fi
+
+      - name: 🔄 Trigger Next 24/7 Continuous Loop Cycle
+        if: always() && (github.event.inputs.auto_restart != 'false')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🚀 Dispatching next 24/7 loop cycle to keep server online indefinitely..."
+          sleep 5
+          curl -s -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/terraria_24_7.yml/dispatches" \
+            -d '{"ref":"main"}'
+          echo "✅ Continuous 24/7 loop dispatched successfully!"
